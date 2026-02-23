@@ -1,0 +1,49 @@
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  disable-all: true
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - typecheck
+    - unused
+
+    - revive
+    - bodyclose
+    - gocritic
+    - gocyclo
+    - gosec
+    - prealloc
+
+linters-settings:
+  gocyclo:
+    min-complexity: 25
+  revive:
+    rules:
+      - name: exported
+        disabled: false
+        arguments:
+          - disableStutteringCheck
+  errcheck:
+    exclude-functions:
+      - (io.Closer).Close
+  gocritic:
+    disabled-checks:
+      - exitAfterDefer
+
+issues:
+  max-issues-per-linter: 50
+  max-same-issues: 3
+  exclude-dirs:
+    - api/proto
+    - bin
+    - vendor
+  exclude-rules:
+    - path: client/cmd/
+      linters:
+        - gocyclo
