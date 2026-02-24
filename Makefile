@@ -3,8 +3,14 @@ lint:
 	golangci-lint run ./...
 	@echo "ok"
 
+lint_auto_fix:
+	go fix ./...
+	golangci-lint run --fix ./...
+	@echo "ok"
+
 test:
 	go test ./pkg/analyzer/...
 
 build:
+	golangci-lint cache clean
 	go build -buildmode=plugin -o loglinter.so ./plugin/main.go

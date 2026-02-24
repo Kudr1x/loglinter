@@ -6,7 +6,6 @@ import (
 	"strings"
 	"sync"
 	"unicode"
-	"unicode/utf8"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/inspect"
@@ -56,46 +55,83 @@ func run(pass *analysis.Pass) (any, error) {
 		}
 
 		fnSignature := fnObj.String()
-
 		if !strings.Contains(fnSignature, "slog") && !strings.Contains(fnSignature, "zap") {
 			return
 		}
 
-		stringsToCheck := extractStrings(call.Args[0])
-		if len(stringsToCheck) == 0 {
-			return
-		}
+		lits := extractBasicLits(call.Args[0])
 
-		fullText := strings.Join(stringsToCheck, "")
-
-		for _, msg := range stringsToCheck {
-			if len(msg) > 0 {
-				firstRune, _ := utf8.DecodeRuneInString(msg)
-				if unicode.IsLetter(firstRune) && !unicode.IsLower(firstRune) {
-					pass.Reportf(call.Pos(), "log message must start with a lowercase letter")
-				}
-				break
+		for i, lit := range lits {
+			rawText := lit.Value
+			if len(rawText) < 2 {
+				continue
 			}
-		}
+			cleanText := rawText[1 : len(rawText)-1]
 
-		isEnglish := true
+			var fixedBuilder strings.Builder
+			hasSpecial := false
+			isEnglish := true
+			hasCapital := false
 
-		for _, msg := range stringsToCheck {
-			for _, r := range msg {
+			for j, r := range cleanText {
 				if r > unicode.MaxASCII {
 					isEnglish = false
 				}
 
-				if !unicode.IsLetter(r) && !unicode.IsDigit(r) && !unicode.IsSpace(r) {
-					pass.Reportf(call.Pos(), "log message must not contain special characters or emojis (found '%c')", r)
-					break
+				if i == 0 && j == 0 && unicode.IsLetter(r) && !unicode.IsLower(r) {
+					hasCapital = true
+					fixedBuilder.WriteRune(unicode.ToLower(r))
+					continue
 				}
+
+				if unicode.IsLetter(r) || unicode.IsDigit(r) || unicode.IsSpace(r) {
+					fixedBuilder.WriteRune(r)
+				} else {
+					hasSpecial = true
+				}
+			}
+
+			if !isEnglish {
+				pass.Reportf(lit.Pos(), "log message must be in English only")
+			}
+
+			var fixes []analysis.SuggestedFix
+			if hasCapital || hasSpecial {
+				newRawText := `"` + fixedBuilder.String() + `"`
+				fixes = []analysis.SuggestedFix{
+					{
+						Message: "Format log message (lowercase and remove special chars)",
+						TextEdits: []analysis.TextEdit{
+							{
+								Pos:     lit.Pos(),
+								End:     lit.End(),
+								NewText: []byte(newRawText),
+							},
+						},
+					},
+				}
+			}
+
+			if hasCapital {
+				pass.Report(analysis.Diagnostic{
+					Pos:            lit.Pos(),
+					Message:        "log message must start with a lowercase letter",
+					SuggestedFixes: fixes,
+				})
+				fixes = nil
+			}
+
+			if hasSpecial {
+				pass.Report(analysis.Diagnostic{
+					Pos:            lit.Pos(),
+					Message:        "log message must not contain special characters or emojis",
+					SuggestedFixes: fixes,
+				})
 			}
 		}
 
-		if !isEnglish {
-			pass.Reportf(call.Pos(), "log message must be in English only")
-		}
+		stringsToCheck := extractStrings(call.Args[0])
+		fullText := strings.Join(stringsToCheck, "")
 
 		hasDynamicData := len(call.Args) > 1
 		if !hasDynamicData {
@@ -120,7 +156,6 @@ func run(pass *analysis.Pass) (any, error) {
 
 func extractStrings(expr ast.Expr) []string {
 	var result []string
-
 	switch e := expr.(type) {
 	case *ast.BasicLit:
 		if e.Kind == token.STRING {
@@ -132,6 +167,21 @@ func extractStrings(expr ast.Expr) []string {
 			result = append(result, extractStrings(e.Y)...)
 		}
 	}
+	return result
+}
 
+func extractBasicLits(expr ast.Expr) []*ast.BasicLit {
+	var result []*ast.BasicLit
+	switch e := expr.(type) {
+	case *ast.BasicLit:
+		if e.Kind == token.STRING {
+			result = append(result, e)
+		}
+	case *ast.BinaryExpr:
+		if e.Op == token.ADD {
+			result = append(result, extractBasicLits(e.X)...)
+			result = append(result, extractBasicLits(e.Y)...)
+		}
+	}
 	return result
 }
