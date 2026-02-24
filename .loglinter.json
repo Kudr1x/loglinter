@@ -6,6 +6,10 @@
     "api_key",
     "apikey",
     "credential",
-    "bitcoin"
+    "card"
+  ],
+
+  "patterns": [
+    "\\d{4}-\\d{4}-\\d{4}-\\d{4}"
   ]
 }
