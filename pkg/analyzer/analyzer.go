@@ -4,12 +4,18 @@ import (
 	"go/ast"
 	"go/token"
 	"strings"
+	"sync"
 	"unicode"
 	"unicode/utf8"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/inspect"
 	"golang.org/x/tools/go/ast/inspector"
+)
+
+var (
+	cfg  Config
+	once sync.Once
 )
 
 var Analyzer = &analysis.Analyzer{
@@ -25,11 +31,11 @@ var logMethods = map[string]bool{
 	"Print": true,
 }
 
-var sensitiveWords = []string{
-	"password", "token", "secret", "api_key", "apikey", "credential",
-}
-
 func run(pass *analysis.Pass) (any, error) {
+	once.Do(func() {
+		cfg = loadConfig()
+	})
+
 	inspect := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
 
 	nodeFilter := []ast.Node{
@@ -100,7 +106,7 @@ func run(pass *analysis.Pass) (any, error) {
 
 		if hasDynamicData {
 			lowerMsg := strings.ToLower(fullText)
-			for _, word := range sensitiveWords {
+			for _, word := range cfg.SensitiveWords {
 				if strings.Contains(lowerMsg, word) {
 					pass.Reportf(call.Pos(), "log message contains potentially sensitive data ('%s')", word)
 					break

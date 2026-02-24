@@ -1,0 +1,11 @@
+{
+  "sensitive_words": [
+    "password",
+    "token",
+    "secret",
+    "api_key",
+    "apikey",
+    "credential",
+    "bitcoin"
+  ]
+}
