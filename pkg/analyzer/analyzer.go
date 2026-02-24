@@ -69,8 +69,13 @@ func isLoggerCall(pass *analysis.Pass, call *ast.CallExpr) bool {
 		return false
 	}
 
-	fnSignature := fnObj.String()
-	return strings.Contains(fnSignature, "slog") || strings.Contains(fnSignature, "zap")
+	pkg := fnObj.Pkg()
+	if pkg == nil {
+		return false
+	}
+
+	pkgPath := pkg.Path()
+	return pkgPath == "log/slog" || pkgPath == "go.uber.org/zap"
 }
 
 func checkFormattingRules(pass *analysis.Pass, call *ast.CallExpr) {
