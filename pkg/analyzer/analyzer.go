@@ -90,11 +90,20 @@ func run(pass *analysis.Pass) (any, error) {
 			pass.Reportf(call.Pos(), "log message must be in English only")
 		}
 
-		lowerMsg := strings.ToLower(fullText)
-		for _, word := range sensitiveWords {
-			if strings.Contains(lowerMsg, word) {
-				pass.Reportf(call.Pos(), "log message contains potentially sensitive data ('%s')", word)
-				break
+		hasDynamicData := len(call.Args) > 1
+		if !hasDynamicData {
+			if _, isBinary := call.Args[0].(*ast.BinaryExpr); isBinary {
+				hasDynamicData = true
+			}
+		}
+
+		if hasDynamicData {
+			lowerMsg := strings.ToLower(fullText)
+			for _, word := range sensitiveWords {
+				if strings.Contains(lowerMsg, word) {
+					pass.Reportf(call.Pos(), "log message contains potentially sensitive data ('%s')", word)
+					break
+				}
 			}
 		}
 	})
