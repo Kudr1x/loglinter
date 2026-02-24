@@ -44,13 +44,14 @@ func run(pass *analysis.Pass) (any, error) {
 			return
 		}
 
-		t := pass.TypesInfo.TypeOf(sel.X)
-		if t == nil {
+		fnObj := pass.TypesInfo.Uses[sel.Sel]
+		if fnObj == nil {
 			return
 		}
-		typeName := t.String()
 
-		if !strings.Contains(typeName, "slog") && !strings.Contains(typeName, "zap") {
+		fnSignature := fnObj.String()
+
+		if !strings.Contains(fnSignature, "slog") && !strings.Contains(fnSignature, "zap") {
 			return
 		}
 

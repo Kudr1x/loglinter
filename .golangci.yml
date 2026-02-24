@@ -20,6 +20,8 @@ linters:
     - gosec
     - prealloc
 
+    - loglinter
+
 linters-settings:
   gocyclo:
     min-complexity: 25
@@ -35,6 +37,10 @@ linters-settings:
   gocritic:
     disabled-checks:
       - exitAfterDefer
+  custom:
+    loglinter:
+      path: loglinter.so
+      description: The linter checks log messages for formatting and security rules.
 
 issues:
   max-issues-per-linter: 50
